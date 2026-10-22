@@ -1,0 +1,32 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swiftc --version
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Inspect bundle
+        run: |
+          file build/SunPet.app/Contents/MacOS/SunPet
+          codesign -dv build/SunPet.app 2>&1 | head -5
+          echo "clips: $(ls build/SunPet.app/Contents/Resources/Clips | wc -l | tr -d ' ')"
+
+      - name: Self test
+        run: ./build/SunPet.app/Contents/MacOS/SunPet --self-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SunPet-app
+          path: build/SunPet.app
