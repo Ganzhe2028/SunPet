@@ -30,7 +30,7 @@
 
 把下面这段整段复制给你的 agent：
 
-> 帮我安装 SunPet 桌宠。执行：`git clone https://github.com/Ganzhe2028/你说太对了-SunPet.git ~/Applications/SunPet && cd ~/Applications/SunPet && ./build.sh && open build/SunPet.app`。前提是 macOS 14+ Apple Silicon，只需要 Xcode Command Line Tools 里的 swiftc，不需要 sudo，也不要改任何系统安全设置。装完确认进程在跑、悬浮窗可见，然后把 `build/SunPet.app` 挪进 /Applications。
+> 帮我安装 SunPet 桌宠。执行：`git clone https://github.com/Ganzhe2028/SunPet.git ~/Applications/SunPet && cd ~/Applications/SunPet && ./build.sh && open build/SunPet.app`。前提是 macOS 14+ Apple Silicon，只需要 Xcode Command Line Tools 里的 swiftc，不需要 sudo，也不要改任何系统安全设置。装完确认进程在跑、悬浮窗可见，然后把 `build/SunPet.app` 挪进 /Applications。
 
 更细的约束写在下面的[给 Agent 的说明](#给-agent-的说明)里。
 
@@ -39,8 +39,8 @@
 需要 macOS 14 或更新、Apple Silicon 的 Mac，以及命令行工具。没装过命令行工具的话，先在终端跑一次 `xcode-select --install`。
 
 ```bash
-git clone https://github.com/Ganzhe2028/你说太对了-SunPet.git
-cd 你说太对了-SunPet
+git clone https://github.com/Ganzhe2028/SunPet.git
+cd SunPet
 ./build.sh
 open build/SunPet.app
 ```
