@@ -7,6 +7,7 @@
 <p align="center">一个住在 macOS 桌面上的「太对了」。点一下，他就说一句。</p>
 
 <p align="center">
+  <img alt="build" src="https://github.com/Ganzhe2028/SunPet/actions/workflows/build.yml/badge.svg">
   <img alt="macOS 14+ / Apple Silicon" src="https://img.shields.io/badge/macOS-14%2B%20%C2%B7%20Apple%20Silicon-black">
   <img alt="no dependencies" src="https://img.shields.io/badge/dependencies-none-brightgreen">
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-blue">
@@ -33,6 +34,10 @@
 > 帮我安装 SunPet 桌宠。执行：`git clone https://github.com/Ganzhe2028/SunPet.git ~/Applications/SunPet && cd ~/Applications/SunPet && ./build.sh && open build/SunPet.app`。前提是 macOS 14+ Apple Silicon，只需要 Xcode Command Line Tools 里的 swiftc，不需要 sudo，也不要改任何系统安全设置。装完确认进程在跑、悬浮窗可见，然后把 `build/SunPet.app` 挪进 /Applications。
 
 更细的约束写在下面的[给 Agent 的说明](#给-agent-的说明)里。
+
+### 直接下载（不想碰终端）
+
+去 [Releases](https://github.com/Ganzhe2028/SunPet/releases/latest) 下载 `SunPet.zip`，解压，把 `SunPet.app` 拖进「应用程序」。第一次打开右键 → 打开。
 
 ### 自己动手（三步）
 
