@@ -81,18 +81,18 @@ open build/SunPet.app
 这一组桌宠共用一套联动协议，同时跑起来会自己接话：
 
 ```
-峰哥 ──┐
-       ├──> 太对了
-薄肌 ──┘
+薄肌 ──> 太对了 ──> 峰哥 ──> 太对了
 ```
 
 | 桌宠 | 说什么 | 在联动里的位置 |
 | --- | --- | --- |
-| [好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 说完，太对了接 |
-| [太对了 · SunPet](https://github.com/Ganzhe2028/SunPet) | 孙宇晨 · 28 句「太对了」 | 接峰哥和薄肌的话 |
-| [薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) | 邵艾伦 · 37 句 | 说完，太对了接 |
+| [好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 接太对了的话，但只在薄肌起的链里 |
+| [太对了 · SunPet](https://github.com/Ganzhe2028/SunPet) | 孙宇晨 · 28 句「太对了」 | 谁说话都接 |
+| [薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) | 邵艾伦 · 37 句 | 起头，自己不接 |
 
-峰哥和薄肌之间不互动，太对了也不被谁接。任意两个或三个同时开着，都是这个关系。
+点薄肌起头会一路接下去：太对了 → 峰哥 → 太对了，四句一串，到第四句停。点峰哥只有太对了接一句就停。点太对了没人接。
+
+峰哥和薄肌之间没有直接通道。太对了接完峰哥链就断了，不会无限往下接 —— 靠通知里带的跳数封顶，不靠谁记得「别接」。
 
 桌面上同时跑着[好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet)或者[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet)的时候，会自己接上：对方说完一句，这边接一句短的，凑成一段捧哏。
 

@@ -3,16 +3,23 @@ import Foundation
 
 // MARK: - 桌宠联动通道
 //
-// 一对多：每个人说的话所有人都能听见，但只听自己配置里那几个。
-// 当前结构「以孙哥为中心」：
-//     峰哥  ──┐
-//             ├──> 太对了（接话）
-//     薄肌  ──┘
-//   峰哥和薄肌之间不互动，太对了也不被别人接。
+// 一对多，带跳数限制。每个人说的话所有人都能听见，但只听自己配置里那几个。
+//
+// 当前结构「薄肌起头，四步收尾」：
+//     薄肌 ──> 太对了 ──> 峰哥 ──> 太对了
+//
+// 峰哥只在「薄肌起的这条链」里接话。用户自己点峰哥，只有太对了接一句就停，
+// 不会把峰哥自己再带出来一次。峰哥和薄肌之间没有直接通道。
+//
+// 两个字段控制这条链：
+//   hop  —— 这句是第几跳，用户自己点的算 0。接话的人广播 hop + 1。
+//   root —— 这条链是谁起的头，一路原样传下去。
+// 太对了最多接 hop = 2 的（第三跳），广播出去 hop = 3 之后没人再接。
+// 这就是防环的手段：不靠拓扑，靠跳数封顶。
 //
 // 通道用 DistributedNotificationCenter：同一个用户会话里跨进程直达，实测 5ms 左右，
 // 不要权限、不开端口、不碰网络。对方在不在跑用 NSRunningApplication 查 bundle id，
-// 不靠"发一条看有没有人回"来猜 —— 对方没启动时发通知只会静默丢掉。
+// 不靠「发一条看有没有人回」来猜 —— 对方没启动时发通知只会静默丢掉。
 //
 // 三份完全相同的副本（SunPet / 好事桌宠 / 薄肌桌宠），改一处要三处同步。
 
@@ -32,7 +39,7 @@ enum PetRole: String, CaseIterable {
 }
 
 enum PetBridgeSignal {
-    /// 有人开口说话了。userInfo: from / clipID / duration / label
+    /// 有人开口说话了。userInfo: from / clipID / duration / label / hop / root
     static let spoke = Notification.Name("com.isaac.petbridge.spoke")
 }
 
@@ -43,8 +50,9 @@ final class PetBridge: NSObject {
 
     /// 我听的那几个人，从「都不在」变成「有人在」或反过来时调用，主线程。
     var onPresenceChange: ((Bool) -> Void)?
-    /// 我该接的那个人说话了，主线程。第一个参数是谁说的，第二个是那句的时长。
-    var onSpoke: ((PetRole, TimeInterval, Int, String) -> Void)?
+    /// 我该接的那个人说话了，主线程。
+    /// 参数：谁说的、那句多长、clipID、文本、第几跳、链的起点
+    var onSpoke: ((PetRole, TimeInterval, Int, String, Int, PetRole) -> Void)?
 
     private var presenceTimer: Timer?
     private var lastPresent: Bool?
@@ -108,14 +116,21 @@ final class PetBridge: NSObject {
         started = false
     }
 
-    /// 广播"我说话了"。没人听就不发。
-    func announceSpeaking(clipID: Int, duration: TimeInterval, label: String) {
+    /// 广播「我说话了」。没人听就不发。
+    ///
+    /// - Parameters:
+    ///   - hop: 第几跳。用户自己点的传 0（默认值），接别人的话传对方的 hop + 1。
+    ///   - root: 这条链的起点。用户自己点的传 nil（就是我自己），接话时原样传下去。
+    func announceSpeaking(clipID: Int, duration: TimeInterval, label: String,
+                          hop: Int = 0, root: PetRole? = nil) {
         guard anyoneElseRunning else { return }
         let info: [String: Any] = [
             "from": me.rawValue,
             "clipID": clipID,
             "duration": duration,
             "label": label,
+            "hop": hop,
+            "root": (root ?? me).rawValue,
         ]
         DistributedNotificationCenter.default().post(
             name: PetBridgeSignal.spoke,
@@ -142,7 +157,9 @@ final class PetBridge: NSObject {
         let duration = (info["duration"] as? Double) ?? 1.0
         let clipID = (info["clipID"] as? Int) ?? 0
         let label = (info["label"] as? String) ?? ""
-        onSpoke?(from, duration, clipID, label)
+        let hop = (info["hop"] as? Int) ?? 0
+        let root = (info["root"] as? String).flatMap(PetRole.init(rawValue:)) ?? from
+        onSpoke?(from, duration, clipID, label, hop, root)
     }
 
     deinit { presenceTimer?.invalidate() }

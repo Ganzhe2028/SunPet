@@ -125,7 +125,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     /// 相声里捧哏本来就是叠着逗哏的尾音接的，等他说完再开口中间会有一截空档。
     let companionOverlap: TimeInterval = 0.3
     var resources: URL { Bundle.main.resourceURL! }
-    var selfTest = CommandLine.arguments.contains("--self-test")
+    let selfTest = CommandLine.arguments.contains("--self-test")
+    /// --trace 时把联动每一跳的时间、跳数、重叠打到 stdout，用来核对四步链的节奏。
+    let trace = CommandLine.arguments.contains("--trace")
+    func traceLog(_ text: String) {
+        guard trace else { return }
+        print("[SUNPET] \(String(format: "%.3f", Date().timeIntervalSince1970)) \(text)")
+        fflush(stdout)
+    }
     var dumpMode = CommandLine.arguments.contains("--dump-mode")
     var testOK = true
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -272,15 +279,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         }
         play(clips[bag.removeLast()])
     }
-    func play(_ clip: Clip) {
+    func play(_ clip: Clip, hop: Int = 0, root: PetRole? = nil) {
         do {
             player?.stop()
             let audio = try AVAudioPlayer(contentsOf: resources.appendingPathComponent("Clips").appendingPathComponent(clip.file))
             player = audio; audio.delegate = self; audio.volume = volume; audio.prepareToPlay()
             guard audio.play() else { throw NSError(domain:"音频播放失败",code:1) }
             lastID = clip.id; pet.animate(true); showCaption(clip.label,seconds:audio.duration+0.5)
-            // 自己说完也广播：链上下一环（薄肌桌宠）要接我的话。
-            if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: audio.duration, label: clip.label) }
+            // 自己说完也广播，链上下一环（峰哥）要接我的话。hop 原样带出去。
+            if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: audio.duration, label: clip.label, hop: hop, root: root) }
         } catch { pet.animate(false); showCaption("播放失败：\(error.localizedDescription)",seconds:5) }
     }
     // MARK: - 捧哏联动
@@ -293,7 +300,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             self.showCaption(present ? "捧哏就位 · \(self.bridge.peerSummary)说完我接" : "逗哏都走了 · 待命", seconds: 4)
         }
         // 峰哥和薄肌谁说都接，接话池是同一个（28 句「太对了」本来就不挑对象）。
-        bridge.onSpoke = { [weak self] _, duration, _, _ in self?.scheduleCompanion(after: duration) }
+        bridge.onSpoke = { [weak self] from, duration, _, _, hop, root in
+            self?.traceLog("收到 \(from.title) 的话 hop=\(hop) root=\(root.title) 时长=\(String(format: "%.2f", duration))")
+            self?.scheduleCompanion(after: duration, hop: hop, root: root)
+        }
         bridge.start()
         bridgeStatus = "捧哏：\(bridge.peerSummary)"
         // 启动那句提示占着字幕，等它退了再报自己的状态。
@@ -306,20 +316,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     }
 
     /// 逗哏说完之后排一次接话。
-    func scheduleCompanion(after duration: TimeInterval) {
+    func scheduleCompanion(after duration: TimeInterval, hop: Int, root: PetRole) {
         guard bridgeEnabled, !selfTest else { return }
-        // 峰哥被连点时只留最后一次的捧哏，不然会连播几句叠不上节奏。
+        // 薄肌 → 太对了 → 峰哥 → 太对了，到这里是第四跳。再往下接就多出来了。
+        guard hop < 3 else { return }
+        // 被连点时只留最后一次的捧哏，不然会连播几句叠不上节奏。
         companionWork?.cancel()
         // 先把要接的那句定下来：每句开头静音长短不同，起播时刻得按它自己的静音补。
         guard let clip = takeCompanionClip() else { return }
         let lead = companionLead[clip.id] ?? 0
-        // 目标是「峰哥那句还剩 companionOverlap 秒的时候，捧哏的第一个字正好出来」。
-        let delay = max(0.02, duration - companionOverlap - lead)
+        // 目标是「对方那句还剩 overlap 秒的时候，捧哏的第一个字正好出来」。
+        // 第二跳（太对了接完轮到峰哥）比默认压紧 0.1 秒，四步连起来才不拖。
+        let overlap = hop == 1 ? max(0.05, companionOverlap - 0.1) : companionOverlap
+        let delay = max(0.02, duration - overlap - lead)
+        traceLog("排接话 hop=\(hop) root=\(root.title) 重叠=\(String(format: "%.2f", overlap)) 等=\(String(format: "%.2f", delay)) 句=\(clip.id)")
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.bridgeEnabled else { return }
             // 自己正说着（手点或摇机身）就不叠上去，这一捧算了。
             guard self.player?.isPlaying != true else { return }
-            self.playCompanion(clip)
+            self.traceLog("开口 hop=\(hop + 1) 句=\(clip.id) \(clip.label)")
+            self.playCompanion(clip, hop: hop + 1, root: root)
         }
         companionWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -330,7 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         return companionBag.popLast()
     }
 
-    func playCompanion(_ clip: Clip) {
+    func playCompanion(_ clip: Clip, hop: Int, root: PetRole) {
         // 用预解码好的 player 直接起播，绕过 play() 里「读文件再解码」那几十毫秒。
         // 捧哏靠的就是准点，起播晚一点整段节奏就散了。
         if let ready = companionPlayers[clip.id] {
@@ -342,11 +358,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
                 lastID = clip.id
                 pet.animate(true)
                 showCaption(clip.label, seconds: ready.duration + 0.5)
-                if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: ready.duration, label: clip.label) }
+                if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: ready.duration, label: clip.label, hop: hop, root: root) }
                 return
             }
         }
-        play(clip)
+        play(clip, hop: hop, root: root)
     }
 
     /// 启动时把捧哏那几句解码好放在内存里，顺便量出各自的开头静音。
