@@ -99,19 +99,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     var lastID: Int?
     var randomMode = true
     var pinnedID: Int?
+    /// 从轮播里剔除的句子 id。勾掉的不参与随机，也不拿去当捧哏。
+    var excludedIDs: Set<Int> = []
     var motion = MotionClient()
     var motionEnabled = false
     var motionStatus = "机身摇晃：未开启"
     var captionWork: DispatchWorkItem?
     var volume: Float = 0.65
     var size: CGFloat = 180
+    // 捧哏联动：好事桌宠说完一句，这边接一句短的。
+    let bridge = PetBridge(me: .sunpet, peers: [.fengge, .shaolan])
+    var bridgeEnabled = true
+    var bridgeStatus = "捧哏：等待峰哥和薄肌"
+    var companionPool: [Clip] = []
+    var companionBag: [Clip] = []
+    var companionWork: DispatchWorkItem?
+    /// 捧哏句预先解码好的播放器，接话时直接用，不用临时读文件。
+    var companionPlayers: [Int: AVAudioPlayer] = [:]
+    /// 每句开头有多少静音。剪辑切出来的段落长短不一，最多差到 0.32 秒，
+    /// 不按它补的话同样提前 0.3 秒，实际出声时刻能飘出小半秒。
+    var companionLead: [Int: TimeInterval] = [:]
+    /// 捧哏只挑最短的几句，逗哏一说完就得接上，长句会把节奏拖垮。
+    let companionIDs: Set<Int> = [1, 2, 4, 11, 13, 14]
+    /// 接话提前多少开始。像 Apple Music 的交叉淡入：峰哥那句还剩这点时间，捧哏就进来。
+    /// 相声里捧哏本来就是叠着逗哏的尾音接的，等他说完再开口中间会有一截空档。
+    let companionOverlap: TimeInterval = 0.3
     var resources: URL { Bundle.main.resourceURL! }
     var selfTest = CommandLine.arguments.contains("--self-test")
     var dumpMode = CommandLine.arguments.contains("--dump-mode")
     var testOK = true
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if !selfTest && !dumpMode {
-            let others = NSRunningApplication.runningApplications(withBundleIdentifier: "local.isaac.SunPet").filter { $0.processIdentifier != getpid() }
+        if !selfTest && !dumpMode, let ownID = Bundle.main.bundleIdentifier {
+            // 原来这里写死了 local.isaac.SunPet，跟 Info.plist 里的
+            // com.ganzhe2028.sunpet 对不上，单实例检测实际上从来没生效过。
+            let others = NSRunningApplication.runningApplications(withBundleIdentifier: ownID).filter { $0.processIdentifier != getpid() }
             if !others.isEmpty { NSApp.terminate(nil); return }
         }
         do {
@@ -125,10 +146,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         if defaults.object(forKey: "size") != nil { size = CGFloat(defaults.double(forKey: "size")) }
         if defaults.object(forKey: "randomMode") != nil { randomMode = defaults.bool(forKey: "randomMode") }
         if defaults.object(forKey: "pinnedID") != nil { pinnedID = defaults.integer(forKey: "pinnedID") }
+        // 注意：defaults.array 拿回来是 [Any] 装 NSNumber，直接 as? [Int] 会失败，
+        // 必须逐项取 intValue。踩过：写进去了但读不出来。
+        if let raw = defaults.array(forKey: "excludedIDs") {
+            excludedIDs = Set(raw.compactMap { entry -> Int? in
+                if let number = entry as? NSNumber { return number.intValue }
+                if let text = entry as? String { return Int(text) }
+                return nil
+            })
+        }
         if !randomMode && !pinValid() { randomMode = true }
         if dumpMode {
             let pin = pinnedID.map { String($0) } ?? "nil"
-            print("mode=\(randomMode ? "random" : "fixed") pinned=\(pin) valid=\(pinValid())")
+            print("mode=\(randomMode ? "random" : "fixed") pinned=\(pin) valid=\(pinValid()) excluded=\(excludedIDs.sorted()) clips=\(clips.count) pool=\(clips.count - excludedIDs.count)")
             fflush(stdout); exit(0)
         }
         size = min(max(size,120),260)
@@ -156,6 +186,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
                 self.motionEnabled = false; self.motion.stop(); self.motionStatus = String(event.dropFirst(6)); self.showCaption(self.motionStatus, seconds: 6)
             }
         }
+        if defaults.object(forKey: "bridgeEnabled") != nil { bridgeEnabled = defaults.bool(forKey: "bridgeEnabled") }
+        companionPool = clips.filter { companionIDs.contains($0.id) && !excludedIDs.contains($0.id) }
+        preloadCompanionClips()
+        if !selfTest && !dumpMode { startBridge() }
         if selfTest { runSelfTest() } else { showCaption("点我一下 · 右键设置", seconds: 5); toggleMotion() }
         updateToolTip()
     }
@@ -188,8 +222,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             sub.addItem(i)
         }
         choose.submenu = sub; m.addItem(choose)
+        let filters = item("轮播内容",nil); let fm = NSMenu()
+        let fhint = item("取消勾选＝不参与随机播",nil); fhint.isEnabled = false; fm.addItem(fhint); fm.addItem(.separator())
+        // 用真正的 NSButton 控件（menuItem.view）而不是菜单项的 state：
+        // 菜单项点一下就整个关闭，取消十句得重开十次菜单。点控件不会关闭。
+        for c in clips {
+            let box = NSButton(checkboxWithTitle: String(format: "%02d  %@",c.id,c.label),
+                               target: self, action: #selector(toggleExclusionBox(_:)))
+            box.tag = c.id
+            box.state = excludedIDs.contains(c.id) ? .off : .on
+            box.font = .systemFont(ofSize: 12)
+            box.sizeToFit()
+            let holder = NSMenuItem()
+            holder.view = box
+            fm.addItem(holder)
+        }
+        fm.addItem(.separator()); fm.addItem(item("全部恢复",#selector(enableAllClips)))
+        filters.submenu = fm; m.addItem(filters)
         m.addItem(item("随机播一次",#selector(randomAction)))
         m.addItem(item("停止播放",#selector(stopAction)))
+        m.addItem(.separator())
+        let bridgeItem = item(bridgeEnabled ? "关闭捧哏联动" : "开启捧哏联动",#selector(toggleBridge)); bridgeItem.state = bridgeEnabled ? .on : .off; m.addItem(bridgeItem)
+        let bridgeInfo = item(bridgeStatus,nil); bridgeInfo.isEnabled = false; m.addItem(bridgeInfo)
         m.addItem(.separator())
         let motionItem = item(motionEnabled ? "关闭机身摇晃" : "开启机身摇晃",#selector(toggleMotion)); motionItem.state = motionEnabled ? .on : .off; m.addItem(motionItem)
         let info = item(motionStatus,nil); info.isEnabled = false; m.addItem(info)
@@ -206,7 +260,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         playRandom()
     }
     func playRandom() {
-        if bag.isEmpty { bag = Array(clips.indices).shuffled(); if bag.count > 1, clips[bag.last!].id == lastID { bag.swapAt(0,bag.count-1) } }
+        // 轮播池：剔掉被勾掉的句子。
+        // bag 里存的是下标，用户中途勾掉某句后旧下标会失效，必须先把它清理掉，
+        // 否则那句还是会照播 —— 自检里的 excluded 项就是抓这个的。
+        let pool = Set(clips.indices.filter { !excludedIDs.contains(clips[$0].id) })
+        guard !pool.isEmpty else { return }
+        bag.removeAll { !pool.contains($0) }
+        if bag.isEmpty {
+            bag = Array(pool).shuffled()
+            if bag.count > 1, clips[bag.last!].id == lastID { bag.swapAt(0, bag.count - 1) }
+        }
         play(clips[bag.removeLast()])
     }
     func play(_ clip: Clip) {
@@ -216,8 +279,116 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             player = audio; audio.delegate = self; audio.volume = volume; audio.prepareToPlay()
             guard audio.play() else { throw NSError(domain:"音频播放失败",code:1) }
             lastID = clip.id; pet.animate(true); showCaption(clip.label,seconds:audio.duration+0.5)
+            // 自己说完也广播：链上下一环（薄肌桌宠）要接我的话。
+            if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: audio.duration, label: clip.label) }
         } catch { pet.animate(false); showCaption("播放失败：\(error.localizedDescription)",seconds:5) }
     }
+    // MARK: - 捧哏联动
+
+    func startBridge() {
+        bridge.onPresenceChange = { [weak self] present in
+            guard let self else { return }
+            self.bridgeStatus = "捧哏：\(self.bridge.peerSummary)"
+            guard self.bridgeEnabled else { return }
+            self.showCaption(present ? "捧哏就位 · \(self.bridge.peerSummary)说完我接" : "逗哏都走了 · 待命", seconds: 4)
+        }
+        // 峰哥和薄肌谁说都接，接话池是同一个（28 句「太对了」本来就不挑对象）。
+        bridge.onSpoke = { [weak self] _, duration, _, _ in self?.scheduleCompanion(after: duration) }
+        bridge.start()
+        bridgeStatus = "捧哏：\(bridge.peerSummary)"
+        // 启动那句提示占着字幕，等它退了再报自己的状态。
+        if bridgeEnabled && bridge.peerIsRunning {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+                guard let self, self.bridgeEnabled, self.bridge.peerIsRunning else { return }
+                if self.player?.isPlaying != true { self.showCaption("捧哏就位 · \(self.bridge.peerSummary)说完我接", seconds: 4) }
+            }
+        }
+    }
+
+    /// 逗哏说完之后排一次接话。
+    func scheduleCompanion(after duration: TimeInterval) {
+        guard bridgeEnabled, !selfTest else { return }
+        // 峰哥被连点时只留最后一次的捧哏，不然会连播几句叠不上节奏。
+        companionWork?.cancel()
+        // 先把要接的那句定下来：每句开头静音长短不同，起播时刻得按它自己的静音补。
+        guard let clip = takeCompanionClip() else { return }
+        let lead = companionLead[clip.id] ?? 0
+        // 目标是「峰哥那句还剩 companionOverlap 秒的时候，捧哏的第一个字正好出来」。
+        let delay = max(0.02, duration - companionOverlap - lead)
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.bridgeEnabled else { return }
+            // 自己正说着（手点或摇机身）就不叠上去，这一捧算了。
+            guard self.player?.isPlaying != true else { return }
+            self.playCompanion(clip)
+        }
+        companionWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    func takeCompanionClip() -> Clip? {
+        if companionBag.isEmpty { companionBag = companionPool.shuffled() }
+        return companionBag.popLast()
+    }
+
+    func playCompanion(_ clip: Clip) {
+        // 用预解码好的 player 直接起播，绕过 play() 里「读文件再解码」那几十毫秒。
+        // 捧哏靠的就是准点，起播晚一点整段节奏就散了。
+        if let ready = companionPlayers[clip.id] {
+            player?.stop()
+            player = ready
+            ready.currentTime = 0
+            ready.volume = volume
+            if ready.play() {
+                lastID = clip.id
+                pet.animate(true)
+                showCaption(clip.label, seconds: ready.duration + 0.5)
+                if !selfTest { bridge.announceSpeaking(clipID: clip.id, duration: ready.duration, label: clip.label) }
+                return
+            }
+        }
+        play(clip)
+    }
+
+    /// 启动时把捧哏那几句解码好放在内存里，顺便量出各自的开头静音。
+    func preloadCompanionClips() {
+        for clip in companionPool {
+            let url = resources.appendingPathComponent("Clips").appendingPathComponent(clip.file)
+            guard let audio = try? AVAudioPlayer(contentsOf: url) else { continue }
+            audio.delegate = self
+            audio.volume = volume
+            audio.prepareToPlay()
+            companionPlayers[clip.id] = audio
+            companionLead[clip.id] = leadingSilence(of: url)
+        }
+    }
+
+    /// 这句音频开头垫了多少静音。阈值按峰值的百分比取，免得把底噪当成人声。
+    func leadingSilence(of url: URL) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url) else { return 0 }
+        let rate = file.processingFormat.sampleRate
+        // 前 0.6 秒足够，再往后就是人声了。
+        let want = AVAudioFrameCount(min(file.length, AVAudioFramePosition(rate * 0.6)))
+        guard want > 0, let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: want) else { return 0 }
+        do { try file.read(into: buffer) } catch { return 0 }
+        guard let channel = buffer.floatChannelData?[0] else { return 0 }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return 0 }
+        var peak: Float = 0
+        for i in 0..<count { peak = max(peak, abs(channel[i])) }
+        let threshold = max(0.004, peak * 0.06)
+        for i in 0..<count where abs(channel[i]) > threshold {
+            return Double(i) / rate
+        }
+        return 0
+    }
+
+    @objc func toggleBridge() {
+        bridgeEnabled.toggle()
+        UserDefaults.standard.set(bridgeEnabled, forKey: "bridgeEnabled")
+        if !bridgeEnabled { companionWork?.cancel(); companionWork = nil }
+        showCaption(bridgeEnabled ? "捧哏联动：开" : "捧哏联动：关", seconds: 3)
+    }
+
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) { pet.animate(false) }
     func showCaption(_ text: String, seconds: Double = 3) {
         captionWork?.cancel(); pet.caption.stringValue = text; pet.caption.isHidden = false
@@ -225,6 +396,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         DispatchQueue.main.asyncAfter(deadline:.now()+seconds,execute:work)
     }
     @objc func randomAction() { playRandom() }
+    /// 菜单里的复选框被点。菜单不会因此关闭，所以可以连着取消好几句。
+    @objc func toggleExclusionBox(_ sender: NSButton) {
+        let id = sender.tag
+        if excludedIDs.contains(id) {
+            excludedIDs.remove(id)
+        } else {
+            guard excludedIDs.count < clips.count - 1 else {
+                sender.state = .on
+                NSSound.beep()
+                return
+            }
+            excludedIDs.insert(id)
+        }
+        UserDefaults.standard.set(Array(excludedIDs), forKey: "excludedIDs")
+        bag.removeAll()
+    }
+
+    /// 勾掉某句：从随机轮播里剔除。至少留一句，否则随机就没东西可播。
+    @objc func toggleExclusion(_ sender: NSMenuItem) {
+        let id = sender.tag
+        if excludedIDs.contains(id) {
+            excludedIDs.remove(id)
+        } else {
+            guard excludedIDs.count < clips.count - 1 else {
+                showCaption("至少留一句在轮播里", seconds: 3)
+                return
+            }
+            excludedIDs.insert(id)
+        }
+        UserDefaults.standard.set(Array(excludedIDs), forKey: "excludedIDs")
+        bag.removeAll()
+        showCaption("轮播里还有 \(clips.count - excludedIDs.count) 句", seconds: 2)
+    }
+
+    @objc func enableAllClips() {
+        excludedIDs.removeAll()
+        UserDefaults.standard.set([Int](), forKey: "excludedIDs")
+        bag.removeAll()
+        showCaption("轮播已恢复全部", seconds: 2)
+    }
     @objc func modeRandom() { setMode(random: true) }
     @objc func modeFixed() { setMode(random: false) }
     func setMode(random: Bool) {
@@ -247,7 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         if !randomMode { pinnedID = c.id; UserDefaults.standard.set(c.id, forKey: "pinnedID") }
         play(c)
     }
-    @objc func stopAction() { player?.stop(); pet.animate(false); pet.caption.isHidden = true }
+    @objc func stopAction() { companionWork?.cancel(); companionWork = nil; player?.stop(); pet.animate(false); pet.caption.isHidden = true }
     @objc func volumeAction(_ sender: NSMenuItem) { volume = Float(sender.tag)/100; player?.volume = volume; UserDefaults.standard.set(volume,forKey:"volume") }
     @objc func sizeAction(_ sender: NSMenuItem) { size = CGFloat(sender.tag); panel.setContentSize(NSSize(width:size,height:size+48)); UserDefaults.standard.set(Double(size),forKey:"size"); savePosition() }
     @objc func resetPosition() {
@@ -263,7 +474,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         do { try motion.start(executable:executable) } catch { motionEnabled = false; motionStatus = error.localizedDescription; showCaption(motionStatus) }
     }
     @objc func quit() { NSApp.terminate(nil) }
-    func applicationWillTerminate(_ notification: Notification) { motion.stop(); player?.stop(); savePosition() }
+    func applicationWillTerminate(_ notification: Notification) { bridge.stop(); companionWork?.cancel(); motion.stop(); player?.stop(); savePosition() }
+    /// 静音读数合理性：不能是负数，也不能长到把整句吃掉。
+    func selfTestLeadSanity() -> Bool {
+        for clip in companionPool {
+            guard let lead = companionLead[clip.id] else { return false }
+            if lead < 0 || lead > clip.duration * 0.6 { return false }
+        }
+        return !companionPool.isEmpty
+    }
+
     func runSelfTest() {
         var checks: [String] = []
         for c in clips {
@@ -294,6 +514,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         }
         if !pinnedOK || pinnedID == nil { testOK = false }
         checks.append("fixed mode: pinned=\(pinnedID ?? -1), stable=\(pinnedOK)")
+        // 排除：勾掉的句子绝不出现在随机里
+        randomMode = true
+        let savedExcluded = excludedIDs
+        excludedIDs = Set(clips.prefix(2).map(\.id))
+        var excludedOK = true
+        for _ in 0..<40 {
+            player?.stop(); playRandom()
+            if let id = lastID, excludedIDs.contains(id) { excludedOK = false }
+        }
+        if !excludedOK { testOK = false }
+        checks.append("excluded: skip=\(excludedIDs.sorted()) clean=\(excludedOK)")
+        excludedIDs = savedExcluded
         // Menu wiring: mode submenu present, every clip listed exactly once, pinned clip checkmarked.
         randomMode = true; pinnedID = nil
         let m1 = makeMenu()
@@ -311,6 +543,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         if mode2?.items.first?.state != .off { testOK = false }
         if marks.count != 1 || marks.first?.tag != clips[2].id { testOK = false }
         checks.append("menu: mode=\(mode1?.items.count ?? -1)/\(mode2?.items.count ?? -1), choose=\(choose1?.items.count ?? -1)/\(choose2?.items.count ?? -1), marked=\(marks.count)")
+        // 捧哏：每句的开头静音都得量出来，否则接话时刻会随抽到的句子飘。
+        let leadReport = companionPool.sorted { $0.id < $1.id }
+            .map { String(format: "%02d:%.3f", $0.id, companionLead[$0.id] ?? -1) }.joined(separator: " ")
+        let leadOK = companionPool.allSatisfy { companionLead[$0.id] != nil } && selfTestLeadSanity()
+        if !leadOK { testOK = false }
+        checks.append("companion lead: \(leadReport)")
+        checks.append("companion preload: \(companionPlayers.count)/\(companionPool.count)")
         randomMode = true; pinnedID = nil
         checks.append(testOK ? "PASS" : "FAIL")
         print(checks.joined(separator:"\n")); fflush(stdout)

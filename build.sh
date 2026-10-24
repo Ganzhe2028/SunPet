@@ -14,7 +14,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 swiftc -O -target arm64-apple-macosx14.0 \
   -framework AppKit -framework AVFoundation -framework IOKit -framework Network \
-  Sources/main.swift Sources/Motion.swift -o "$APP/Contents/MacOS/SunPet"
+  Sources/main.swift Sources/Motion.swift Sources/Bridge.swift -o "$APP/Contents/MacOS/SunPet"
 
 cp -R Assets/. "$APP/Contents/Resources/"
 

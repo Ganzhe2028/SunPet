@@ -76,6 +76,35 @@ open build/SunPet.app
 
 这个选择会记在系统里，退出重开还是你那句。存的选择要是坏掉了（比如对应文件没了），会自动退回随机，不会卡在静音上。
 
+### 三个桌宠
+
+这一组桌宠共用一套联动协议，同时跑起来会自己接话：
+
+```
+峰哥 ──┐
+       ├──> 太对了
+薄肌 ──┘
+```
+
+| 桌宠 | 说什么 | 在联动里的位置 |
+| --- | --- | --- |
+| [好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 说完，太对了接 |
+| [太对了 · SunPet](https://github.com/Ganzhe2028/SunPet) | 孙宇晨 · 28 句「太对了」 | 接峰哥和薄肌的话 |
+| [薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) | 邵艾伦 · 37 句 | 说完，太对了接 |
+
+峰哥和薄肌之间不互动，太对了也不被谁接。任意两个或三个同时开着，都是这个关系。
+
+桌面上同时跑着[好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet)或者[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet)的时候，会自己接上：对方说完一句，这边接一句短的，凑成一段捧哏。
+
+- **自动起作用**：两边都在跑就生效，不用配对、不开端口、不联网。对方退出后自动停下，菜单里会显示「捧哏：等待好事桌宠」。
+- **第一个字压在峰哥尾音上**：等他说完再开口，中间会空出一截，听着像卡了一下。所以目标是峰哥那句还剩 0.3 秒的时候，捧哏的第一个字正好出来，跟 Apple Music 交叉淡入一个意思。
+- **按每句自己的静音算**：剪辑切出来的片段开头垫的静音长短差很多，这 6 句里最多的垫了 0.32 秒、最少的只有 0.001 秒。启动时逐句量出来，起播时刻各自补偿，不然同样提前 0.3 秒，实际出声时刻能飘出小半秒。捧哏句还会预先解码好，接话时不走读文件那条路。
+- **只挑短句**：捧哏池是 6 句一秒以内的应答（「太对了」「这这太对了」之类），长句会把节奏拖垮。
+- **不抢话**：自己正在说（手点头像或者摇机身）的时候，这一捧直接跳过，不会两个声音糊在一起。
+- 点头像照旧随机说一句，联动不改变原来的玩法。不想要了在右键菜单里关掉。
+
+实现上是三个应用通过 `DistributedNotificationCenter` 传一条本机通知，对方在不在跑用 bundle id 查 `NSRunningApplication`，不靠「发一条看有没有人回」来猜。协议和存活检测都在 `Sources/Bridge.swift`，三个仓库各放一份内容完全相同的副本，改动要同步。
+
 ### 摇一摇是怎么做到的
 
 读 Mac 自带的加速度计（Apple SPU）。不碰麦克风和摄像头。
@@ -100,6 +129,7 @@ open build/SunPet.app
 - 验证装好了：`pgrep -fl "SunPet.app/Contents/MacOS/SunPet"` 应该看到一个主进程加一个 `--motion-helper` 子进程。更严谨一点，查窗口是否存在（`onscreen=1 alpha=1`）
 - 自检：`./build/SunPet.app/Contents/MacOS/SunPet --self-test` —— 会跑完 28 条音频、摇晃检测器、菜单结构、固定模式不变量，最后打印 `PASS`
 - 读当前设置：`--dump-mode`，输出 `mode=random|fixed pinned=<id> valid=<bool>`
+- 联动排错：右键菜单里看那行「捧哏：…」，显示对方在不在跑。两个都开着还没动静，先确认 `com.ganzhe2028.sunpet` 和 `local.goodthing.desktop-pet` 两个 bundle id 的进程确实都在
 - 设置存在 `defaults` 域 `com.ganzhe2028.sunpet`
 - 卸载：退出进程，删掉 app，再 `defaults delete com.ganzhe2028.sunpet`
 
@@ -107,8 +137,9 @@ open build/SunPet.app
 
 | 文件 | 干什么的 |
 | --- | --- |
-| `Sources/main.swift` | 窗口、菜单、播放、播放方式、自检 |
+| `Sources/main.swift` | 窗口、菜单、播放、播放方式、捧哏时机、自检 |
 | `Sources/Motion.swift` | 加速度计读取、摇晃判定、进程间通信 |
+| `Sources/Bridge.swift` | 和好事桌宠的捧哏联动通道：通知协议、对方存活检测。两边仓库同一份 |
 | `Assets/clips.json` | 句子清单：编号、文案、时间码、文件名、时长 |
 | `Assets/Clips/*.m4a` | 28 段音频 |
 | `Assets/face.png` | 头像 |
