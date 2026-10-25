@@ -2,10 +2,18 @@
 
 <p align="center">孙宇晨住进你的 macOS 桌面。点一下，他说一句「太对了」。摇一下电脑，他也接一句。</p>
 
-|  |  |  |
-|:---:|:---:|:---:|
-| [<img src="https://github.com/Ganzhe2028/ShaolanPet/raw/main/Assets/face.png" width="100">](https://github.com/Ganzhe2028/ShaolanPet) | [<img src="https://github.com/Ganzhe2028/SunPet/raw/main/Assets/face.png" width="100">](https://github.com/Ganzhe2028/SunPet) | [<img src="https://github.com/Ganzhe2028/FengGe-Desktop-Pet/raw/main/Assets/face.png" width="100">](https://github.com/Ganzhe2028/FengGe-Desktop-Pet) |
-| 薄肌 | **太对了**<br>← 你在看这个 | 好事 |
+<table align="center" width="100%">
+<tr>
+<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/ShaolanPet"><img src="https://github.com/Ganzhe2028/ShaolanPet/raw/main/Assets/face.png" width="120"></a></td>
+<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/SunPet"><img src="https://github.com/Ganzhe2028/SunPet/raw/main/Assets/face.png" width="120"></a></td>
+<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/FengGe-Desktop-Pet"><img src="https://github.com/Ganzhe2028/FengGe-Desktop-Pet/raw/main/Assets/face.png" width="120"></a></td>
+</tr>
+<tr>
+<td align="center">薄肌</td>
+<td align="center"><b>太对了</b><br><sub>你在看这个</sub></td>
+<td align="center">好事</td>
+</tr>
+</table>
 
 三个桌宠住在一起会自己接话：薄肌 → 太对了 → 峰哥 → 太对了。点脸进各自的仓库，只装一个也能用。
 
