@@ -86,7 +86,7 @@ open build/SunPet.app
 
 | 桌宠 | 说什么 | 在联动里的位置 |
 | --- | --- | --- |
-| [好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 接太对了的话，但只在薄肌起的链里 |
+| [好事桌宠](https://github.com/Ganzhe2028/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 接太对了的话，但只在薄肌起的链里 |
 | [太对了 · SunPet](https://github.com/Ganzhe2028/SunPet) | 孙宇晨 · 28 句「太对了」 | 谁说话都接 |
 | [薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) | 邵艾伦 · 37 句 | 起头，自己不接 |
 
@@ -94,7 +94,7 @@ open build/SunPet.app
 
 峰哥和薄肌之间没有直接通道。太对了接完峰哥链就断了，不会无限往下接 —— 靠通知里带的跳数封顶，不靠谁记得「别接」。
 
-桌面上同时跑着[好事桌宠](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet)或者[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet)的时候，会自己接上：对方说完一句，这边接一句短的，凑成一段捧哏。
+桌面上同时跑着[好事桌宠](https://github.com/Ganzhe2028/FengGe-Desktop-Pet)或者[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet)的时候，会自己接上：对方说完一句，这边接一句短的，凑成一段捧哏。
 
 - **自动起作用**：同时在跑就生效，不用配对、不开端口、不联网。对方退出后自动停下，菜单里会显示「捧哏：都不在」。
 - **第一个字压在尾音上**：等对方说完再开口，中间会空出一截，听着像卡了一下。所以目标是那句还剩 0.3 秒的时候，捧哏的第一个字正好出来，跟 Apple Music 交叉淡入一个意思。
