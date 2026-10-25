@@ -67,6 +67,8 @@ open build/SunPet.app
 
 ### 三个桌宠
 
+第四个是 [果冻桌宠](https://github.com/aurelius358/JellyPet)：形状挂件，没有语音，也不在 `Bridge.swift` 这套协议里，所以不接话。
+
 这一组桌宠共用一套联动协议，同时跑起来会自己接话：
 
 ```
