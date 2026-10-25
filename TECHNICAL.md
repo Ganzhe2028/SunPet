@@ -147,3 +147,12 @@ open build/SunPet.app
 ## License
 
 代码 MIT，见 [LICENSE](LICENSE)。音频、头像等素材版权归原权利人所有。
+
+## 加第四个人
+
+三个仓库是同一份代码的复制品，加角色就是复制这个模式：
+
+1. `Sources/Bridge.swift` 的 `PetRole` 枚举加一个 case，值是新角色的 bundle id，`displayName` 里补中文名。
+2. `peers` 表决定「我听谁」。现在三份是各自硬编码的：想让它接谁的话，就把谁加进去；只说不接的角色 peers 留空。
+3. `Bridge.swift` 三个仓库逐字节相同（md5 一致），改一处就要三处同步，否则联动会半通。
+4. 新仓库直接复制任意一个，换掉 `Assets/` 里的音频、`clips.json`、`face.png` 和 bundle id，`./build.sh --package` 出安装包。
