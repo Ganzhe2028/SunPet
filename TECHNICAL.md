@@ -26,7 +26,7 @@
 
 ### 直接下载（不想碰终端）
 
-去 [Releases](https://github.com/Ganzhe2028/SunPet/releases/latest) 下载 `SunPet.zip`，解压，把 `SunPet.app` 拖进「应用程序」。第一次打开右键 → 打开。
+去 [Releases](https://github.com/Ganzhe2028/SunPet/releases/latest) 下载最新的 `SunPet-1.1.0.dmg`，双击打开，把 `SunPet.app` 拖进「应用程序」。第一次打开右键 → 打开。
 
 ### 自己动手（三步）
 
