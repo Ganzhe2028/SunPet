@@ -4,22 +4,26 @@
 
 <table align="center" width="100%">
 <tr>
-<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/ShaolanPet"><img src="https://github.com/Ganzhe2028/ShaolanPet/raw/main/Assets/face.png" width="120"></a></td>
-<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/SunPet"><img src="https://github.com/Ganzhe2028/SunPet/raw/main/Assets/face.png" width="120"></a></td>
-<td align="center" width="33%"><a href="https://github.com/Ganzhe2028/FengGe-Desktop-Pet"><img src="https://github.com/Ganzhe2028/FengGe-Desktop-Pet/raw/main/Assets/face.png" width="120"></a></td>
+<td align="center" width="25%"><a href="https://github.com/Ganzhe2028/ShaolanPet"><img src="https://github.com/Ganzhe2028/ShaolanPet/raw/main/Assets/face.png" width="110"></a></td>
+<td align="center" width="25%"><a href="https://github.com/Ganzhe2028/SunPet"><img src="https://github.com/Ganzhe2028/SunPet/raw/main/Assets/face.png" width="110"></a></td>
+<td align="center" width="25%"><a href="https://github.com/Ganzhe2028/FengGe-Desktop-Pet"><img src="https://github.com/Ganzhe2028/FengGe-Desktop-Pet/raw/main/Assets/face.png" width="110"></a></td>
+<td align="center" width="25%"><a href="https://github.com/aurelius358/JellyPet"><img src="https://github.com/aurelius358/JellyPet/raw/main/Assets/claude-mark.png" width="110"></a></td>
 </tr>
 <tr>
 <td align="center">薄肌</td>
 <td align="center"><b>太对了</b><br><sub>你在看这个</sub></td>
 <td align="center">好事</td>
+<td align="center">果冻</td>
 </tr>
 </table>
 
-三个各自独立的 App，不是三个皮肤。点哪张脸进哪个仓库，各自下载。三个同时开着会互相接话，凑成一段捧哏。
+四个各自独立的 App，不是四个皮肤。点哪张脸进哪个仓库。
+
+薄肌、太对了、好事三个同时开着会互相接话，凑成一段捧哏；果冻是新来的，还没接进这套联动。
 
 ## 装
 
-先装一个就行。三个都装，它们才会互相接话。
+先装一个就行。这三个都装，它们才会互相接话。
 
 1. 从 [Releases](https://github.com/Ganzhe2028/SunPet/releases/latest) 下载最新的 `.dmg`
 2. 双击打开，把 app 拖进「应用程序」
@@ -38,5 +42,7 @@
 代码 MIT。换脸、换声音、加人、做一个你自己的热梗桌宠，都随便改。
 
 做出来发到抖音、B站、小红书，带上 `#桌宠接话`，互相 @ 起来。这一组越多人做越好玩。
+
+已经有人做出来了：[果冻桌宠](https://github.com/aurelius358/JellyPet)。
 
 头像和声音的版权属于原权利人，不在 MIT 许可里，不商用。细节见 [NOTICE.md](NOTICE.md)。
