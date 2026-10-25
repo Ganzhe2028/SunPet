@@ -1,6 +1,6 @@
 <h1 align="center">你说太对了 · SunPet</h1>
 
-<p align="center">(抖音原视频)[https://www.douyin.com/video/7700085577455188723]里那个点一下就说「太对了」的桌宠，现在住在你的 Mac 桌面上。</p>
+<p align="center"><a href="https://www.douyin.com/video/7700085577455188723">抖音原视频</a>里那个点一下就说「太对了」的桌宠，现在住在你的 Mac 桌面上。</p>
 
 <p align="center">仅 macOS 14+ · Apple Silicon ｜ <a href="https://github.com/Ganzhe2028/SunPet/releases/latest"><b>下载安装包</b></a></p>
 
