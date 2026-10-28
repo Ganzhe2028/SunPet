@@ -41,7 +41,9 @@
 
 ## 拿去做你自己的
 
-代码 MIT。换脸、换声音、加人、做一个你自己的热梗桌宠，都随便改。Windows 版还没有，欢迎有人做一套。
+代码 MIT。换脸、换声音、加人、做一个你自己的热梗桌宠，都随便改。
+
+Windows 用户可以用 [SunPet-Windows](https://github.com/asteriodqe-cyber/SunPet-Windows)，由 [@asteriodqe-cyber](https://github.com/asteriodqe-cyber) 移植，支持 Windows 10/11：[下载安装包](https://github.com/asteriodqe-cyber/SunPet-Windows/releases/latest)。
 
 做出来发到抖音、B站、小红书，带上 `#桌宠接话`，互相 @ 起来。这一组越多人做越好玩。
 
